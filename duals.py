@@ -185,42 +185,48 @@ for label, cmd in [("Enable", start_camera), ("Disable", stop_camera)]:
 def predict_and_display():
     global cap, running, last_prediction, last_time, word_buffer
     cap = cv2.VideoCapture(0)
+
     while running:
         ret, frame = cap.read()
         if not ret:
             continue
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        H, W, _ = frame.shape
+
         results = hands.process(frame_rgb)
         predicted_character = None
 
         if results.multi_hand_landmarks:
-            hand_landmarks = results.multi_hand_landmarks[0]
-            mp_drawing.draw_landmarks(
-                frame, hand_landmarks,
-                mp_hands.HAND_CONNECTIONS,
-                mp_drawing_styles.get_default_hand_landmarks_style(),
-                mp_drawing_styles.get_default_hand_connections_style()
-            )
+            for hand_landmarks in results.multi_hand_landmarks:
+                mp_drawing.draw_landmarks(
+                    frame, hand_landmarks,
+                    mp_hands.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style()
+                )
 
-            x_, y_, data_aux = [], [], []
-            for lm in hand_landmarks.landmark:
-                x_.append(lm.x)
-                y_.append(lm.y)
-            for lm in hand_landmarks.landmark:
-                data_aux.append(lm.x - min(x_))
-                data_aux.append(lm.y - min(y_))
+                x_, y_, data_aux = [], [], []
 
-            prediction = model.predict([np.asarray(data_aux)])
-            predicted_character = labels_dict[int(prediction[0])]
+                for lm in hand_landmarks.landmark:
+                    x_.append(lm.x)
+                    y_.append(lm.y)
+
+                for lm in hand_landmarks.landmark:
+                    data_aux.append(lm.x - min(x_))
+                    data_aux.append(lm.y - min(y_))
+
+                prediction = model.predict([np.asarray(data_aux)])
+                predicted_character = labels_dict[int(prediction[0])]
+                break
 
         current_time = time.time()
         if predicted_character:
             if predicted_character == last_prediction:
-                if current_time - last_time >= 1.0:
+                if current_time - last_time >= 1.5:
                     word_buffer += predicted_character
-                    update_text()
                     last_time = current_time
+                    update_text()
             else:
                 last_prediction = predicted_character
                 last_time = current_time
@@ -228,19 +234,19 @@ def predict_and_display():
         img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         imgtk = ImageTk.PhotoImage(image=img)
 
-        H, W, _ = frame.shape
         canvas_w = camera_canvas.winfo_width()
         canvas_h = camera_canvas.winfo_height()
         x_offset = (canvas_w - W) // 2 if canvas_w > W else 0
         y_offset = (canvas_h - H) // 2 if canvas_h > H else 0
 
-        camera_canvas.imgtk = imgtk
         if camera_canvas.image_id is None:
             camera_canvas.image_id = camera_canvas.create_image(
                 x_offset, y_offset, anchor='nw', image=imgtk)
         else:
             camera_canvas.coords(camera_canvas.image_id, x_offset, y_offset)
             camera_canvas.itemconfig(camera_canvas.image_id, image=imgtk)
+
+        camera_canvas.imgtk = imgtk
 
     cap.release()
 
