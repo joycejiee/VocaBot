@@ -16,6 +16,7 @@ mp_drawing_styles = mp.solutions.drawing_styles
 hands = mp_hands.Hands(static_image_mode=True, min_detection_confidence=0.3)
 
 labels_dict = [chr(65 + i) for i in range(26)]
+
 while True:
 
     data_aux = []
