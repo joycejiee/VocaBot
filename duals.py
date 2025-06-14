@@ -8,6 +8,16 @@ import pickle
 import threading
 import pyttsx3
 import time
+import sounddevice as sd
+from scipy.io.wavfile import write
+import tempfile
+import openai
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+openai.api_key = os.getenv("OPEN_API_KEY")
 
 # Load ML model
 model_dict = pickle.load(open('./model.p', 'rb'))
@@ -26,6 +36,7 @@ last_time = 0
 running = False
 cap = None
 
+# Main window: Deaf Crew
 root = tk.Tk()
 root.title("VöcaBot - Crew")
 root.geometry("960x540")
@@ -86,6 +97,7 @@ for label, cmd in [("Enable", start_camera), ("Disable", stop_camera),
               font=("Helvetica", 10, "bold"), padx=10, pady=5, relief="raised",
               command=cmd).pack(side="left", padx=10)
 
+# Customer window
 cust_win = tk.Toplevel(root)
 cust_win.title("VöcaBot - Speech to Text")
 cust_win.geometry("960x540")
@@ -128,20 +140,46 @@ def reset_text():
     update_text()
 
 
+def capture_and_transcribe():
+    duration = 5
+    fs = 44100
+    print("🎙️ Recording...")
+
+    recording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+    sd.wait()
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
+        write(temp_wav.name, fs, recording)
+
+        with open(temp_wav.name, "rb") as audio_file:
+            try:
+                transcript = openai.Audio.transcribe("whisper-1", audio_file)
+                spoken_text = transcript["text"]
+                speech_var.set(spoken_text)
+                send_text()
+            except Exception as e:
+                print("❌ Error with transcription:", e)
+
+
+# Left buttons: Send, Reset, Transcribe
 left_btns = tk.Frame(cust_button_frame, bg="white")
 left_btns.pack(side="left")
-for label, cmd in [("Send", send_text), ("Reset", reset_text)]:
+
+for label, cmd in [("Send", send_text), ("Reset", reset_text), ("🎤 Transcribe", capture_and_transcribe)]:
     tk.Button(left_btns, text=label, bg="#f57c00", fg="white",
               font=("Helvetica", 10, "bold"), padx=10, pady=5, relief="raised",
               command=cmd).pack(side="left", padx=10)
 
+# Right buttons: Enable, Disable
 right_btns = tk.Frame(cust_button_frame, bg="white")
 right_btns.pack(side="right")
+
 for label, cmd in [("Enable", start_camera), ("Disable", stop_camera)]:
     tk.Button(right_btns, text=label, bg="#f57c00", fg="white",
               font=("Helvetica", 10, "bold"), padx=10, pady=5, relief="raised",
               command=cmd).pack(side="left", padx=10)
 
+# Prediction and Camera Drawing
 
 
 def predict_and_display():

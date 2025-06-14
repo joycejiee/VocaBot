@@ -2,5 +2,5 @@ opencv-python
 mediapipe
 scikit-learn
 pyttsx3
-openai
+openai==0.28
 python-dotenv
